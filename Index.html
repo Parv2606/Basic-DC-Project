@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Communication Simulator Pro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header>
+        <h1>Data Communication &amp; Networking Simulator</h1>
+        <p>Interactive tool for Line Coding, Multiplexing, Error Detection, and Error Correction</p>
+    </header>
+
+    <nav>
+        <button id="btn-line-coding" class="active-btn" onclick="showModule('line-coding')">Line Coding</button>
+        <button id="btn-multiplexing" onclick="showModule('multiplexing')">Multiplexing</button>
+        <button id="btn-error-detection" onclick="showModule('error-detection')">Error Detection</button>
+        <button id="btn-error-correction" onclick="showModule('error-correction')">Error Correction</button>
+    </nav>
+
+    <main>
+        <!-- MODULE 1: LINE CODING -->
+        <section id="line-coding" class="module active">
+            <h2>Line Coding Simulator (Animated)</h2>
+            <div class="controls">
+                <div class="input-group">
+                    <label>Binary Stream:</label>
+                    <input type="text" id="lc-data" value="1011001" placeholder="e.g. 1011001">
+                </div>
+                <div class="input-group">
+                    <label>Encoding Scheme:</label>
+                    <select id="lc-scheme">
+                        <option value="unipolar-nrz">Unipolar NRZ</option>
+                        <option value="polar-nrz-l">Polar NRZ-L</option>
+                        <option value="polar-nrz-i">Polar NRZ-I</option>
+                        <option value="manchester">Manchester</option>
+                        <option value="diff-manchester">Differential Manchester</option>
+                        <option value="ami">AMI (Bipolar)</option>
+                    </select>
+                </div>
+                <button class="action-btn" onclick="startLineCoding()">Simulate</button>
+            </div>
+            <div class="canvas-container">
+                <canvas id="canvas-lc" width="900" height="300"></canvas>
+                <div class="hover-info" id="lc-hover-info">Hover over signal</div>
+            </div>
+            <div class="output-box" id="lc-output"></div>
+        </section>
+
+        <!-- MODULE 2: MULTIPLEXING -->
+        <section id="multiplexing" class="module">
+            <h2>Multiplexing Simulator</h2>
+            <div class="controls">
+                <div class="input-group">
+                    <label>Technique:</label>
+                    <select id="mux-type" onchange="updateMuxInputs()">
+                        <option value="fdm">FDM (Frequency Division - Analog)</option>
+                        <option value="tdm">TDM (Time Division - Digital)</option>
+                    </select>
+                </div>
+                <div id="mux-fdm-inputs" class="sub-controls">
+                    <div class="input-group">
+                        <label>Freq 1:</label> <input type="number" id="fdm-f1" value="10" min="1" max="50">
+                    </div>
+                    <div class="input-group">
+                        <label>Freq 2:</label> <input type="number" id="fdm-f2" value="20" min="1" max="50">
+                    </div>
+                    <div class="input-group">
+                        <label>Freq 3:</label> <input type="number" id="fdm-f3" value="35" min="1" max="50">
+                    </div>
+                </div>
+                <div id="mux-tdm-inputs" style="display:none;" class="sub-controls">
+                    <div class="input-group">
+                        <label>Src A:</label> <input type="text" id="mux-s1" value="101" maxlength="8">
+                    </div>
+                    <div class="input-group">
+                        <label>Src B:</label> <input type="text" id="mux-s2" value="110" maxlength="8">
+                    </div>
+                    <div class="input-group">
+                        <label>Src C:</label> <input type="text" id="mux-s3" value="001" maxlength="8">
+                    </div>
+                </div>
+                <button class="action-btn" onclick="startMultiplexing()">Simulate</button>
+            </div>
+
+            <div class="canvas-container" id="mux-canvas-container">
+                <canvas id="canvas-mux-fdm" width="900" height="450"></canvas>
+                <div id="tdm-anim-container" style="display:none;"></div>
+            </div>
+            <div class="output-box" id="mux-output"></div>
+        </section>
+
+        <!-- MODULE 3: ERROR DETECTION -->
+        <section id="error-detection" class="module">
+            <h2>Error Detection</h2>
+            <div class="controls">
+                <div class="input-group">
+                    <label>Data Block:</label>
+                    <input type="text" id="ed-data" value="1101011011" placeholder="Binary">
+                </div>
+                <div class="input-group">
+                    <label>Detection Method:</label>
+                    <select id="ed-method" onchange="updateEdInputs()">
+                        <option value="parity-even">Parity (Even)</option>
+                        <option value="checksum">Checksum (8-bit segmentation)</option>
+                        <option value="crc">CRC (Cyclic Redundancy Check)</option>
+                    </select>
+                </div>
+                <div id="ed-crc-divisor" style="display:none;" class="input-group">
+                    <label>Generator (Poly):</label>
+                    <input type="text" id="ed-poly" value="1001" placeholder="e.g. 1001">
+                </div>
+                <button class="action-btn" onclick="startErrorDetection()">Simulate</button>
+            </div>
+            <div class="interactive-container" id="ed-visual-area">
+                <p>Calculation details will appear here.</p>
+            </div>
+        </section>
+
+        <!-- MODULE 4: ERROR CORRECTION -->
+        <section id="error-correction" class="module">
+            <h2>Error Correction (Hamming 7,4 Code)</h2>
+            <div class="controls">
+                <div class="input-group">
+                    <label>4-bit Data:</label>
+                    <input type="text" id="ec-data" value="1011" maxlength="4" placeholder="4 bit binary">
+                </div>
+                <button class="action-btn animate-btn" onclick="generateHamming()">Generate Codeword</button>
+            </div>
+
+            <div class="interactive-container">
+                <div id="ec-gen-visual" class="bit-container"></div>
+            </div>
+
+            <hr style="margin:20px 0; border: 1px dashed #ccc;">
+
+            <div class="controls">
+                <div class="input-group">
+                    <label>Receiver Input:</label>
+                    <input type="text" id="ec-rx" maxlength="7" placeholder="e.g. 0110011 (7 bits)">
+                </div>
+                <button class="action-btn animate-btn fault-btn" onclick="injectRandomError()">Corrupt Random
+                    Bit</button>
+                <button class="action-btn animate-btn" onclick="detectErrorHamming()">Run Detection/Correction</button>
+            </div>
+
+            <div class="interactive-container">
+                <div id="ec-det-visual"></div>
+            </div>
+        </section>
+    </main>
+
+    <script src="main.js"></script>
+</body>
+
+</html>
