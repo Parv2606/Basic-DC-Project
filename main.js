@@ -157,115 +157,211 @@ function updateMuxInputs() {
     $('canvas-mux-fdm').style.display  = isTDM ? 'none' : 'block';
     $('tdm-anim-container').style.display = isTDM ? 'block' : 'none';
 }
-window.onload = updateMuxInputs;
+window.onload = () => {
+    updateMuxInputs();
+    updateEdInputs();
+};
 
 function startMultiplexing() {
     if (currentFdmAnim) cancelAnimationFrame(currentFdmAnim);
+
     const type   = $('mux-type').value;
     const output = $('mux-output');
 
     if (type === 'fdm') {
-        const canvas = $('canvas-mux-fdm'), ctx = canvas.getContext('2d');
+        const canvas = $('canvas-mux-fdm');
+        const ctx = canvas.getContext('2d');
+
         const freqs  = [1,2,3].map(i => parseFloat($(`fdm-f${i}`).value) || [10,20,35][i-1]);
         const colors = ['#e74c3c','#2ecc71','#9b59b6'];
-        let phase = 0;
 
-        output.innerHTML = `<strong>FDM Simulation Running</strong><br>
-<div style="margin-top:10px;padding:10px;background:#f0f0f0;border-left:4px solid #cc0000;color:#000;font-family:sans-serif;font-size:14px"><strong>Explanation:</strong> FDM assigns each source a unique carrier frequency (${freqs.join('Hz, ')}Hz). The composite output is their summed analog signal transmitted simultaneously.</div>`;
+        output.innerHTML = `<strong>FDM Simulation (Static)</strong><br>
+        <div style="margin-top:10px;padding:10px;background:#f0f0f0;border-left:4px solid #cc0000;color:#000;font-family:sans-serif;font-size:14px">
+        <strong>Explanation:</strong> Each signal is assigned a different frequency (${freqs.join('Hz, ')}Hz) and all are transmitted simultaneously. Below is a static representation.
+        </div>`;
 
-        function drawLiveFDM() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const w = canvas.width - 60, rowH = canvas.height / 4, sx = 40;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            freqs.forEach((freq, idx) => {
-                ctx.fillStyle = '#000'; ctx.font = 'bold 12px Consolas';
-                ctx.fillText(`CH${idx+1} (${freq}Hz)`, sx, 20 + idx*rowH - 5);
-                ctx.beginPath(); ctx.strokeStyle = colors[idx]; ctx.lineWidth = 2;
-                let midY = 20 + idx*rowH + rowH/2; ctx.moveTo(sx, midY);
-                for (let i = 0; i < w; i += 2)
-                    ctx.lineTo(sx+i, midY - Math.sin(i/w*Math.PI*2*freq - phase*freq*0.5)*(rowH/2-15));
-                ctx.stroke();
-            });
+        const w = canvas.width - 60;
+        const rowH = canvas.height / 4;
+        const sx = 40;
 
-            ctx.fillStyle = '#000'; ctx.font = 'bold 12px Consolas';
-            ctx.fillText('Composite Output', sx, 20 + rowH*3 - 5);
-            ctx.beginPath(); ctx.strokeStyle = '#34495e'; ctx.lineWidth = 2.5;
-            let midY = 20 + rowH*3 + rowH/2; ctx.moveTo(sx, midY);
-            for (let i = 0; i < w; i += 2) {
-                let combined = freqs.reduce((s, f) => s + Math.sin(i/w*Math.PI*2*f - phase*f*0.5), 0) / freqs.length;
-                ctx.lineTo(sx+i, midY - combined*(rowH/2-5));
+        // Draw individual signals
+        freqs.forEach((freq, idx) => {
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px Consolas';
+            ctx.fillText(`CH${idx+1} (${freq}Hz)`, sx, 20 + idx*rowH - 5);
+
+            ctx.beginPath();
+            ctx.strokeStyle = colors[idx];
+            ctx.lineWidth = 2;
+
+            let midY = 20 + idx*rowH + rowH/2;
+            ctx.moveTo(sx, midY);
+
+            for (let i = 0; i < w; i++) {
+                let y = Math.sin(i/w * Math.PI * 2 * freq);
+                ctx.lineTo(sx + i, midY - y * (rowH/2 - 15));
             }
             ctx.stroke();
-            phase += 0.05;
-            currentFdmAnim = requestAnimationFrame(drawLiveFDM);
-        }
-        drawLiveFDM();
-
-    } else {
-        const sources  = [1,2,3].map(i => $(`mux-s${i}`).value.trim() || '-');
-        const colors   = ['#34495e','#2ecc71','#e74c3c'];
-        const labels   = ['Buffer A:','Buffer B:','Buffer C:'];
-        const yStarts  = [50, 120, 190];
-        const maxLen   = Math.max(...sources.map(s => s.length));
-        const container = $('tdm-anim-container');
-        container.innerHTML = '';
-        const targetY = 320;
-
-        output.innerHTML = `<strong>TDM Simulation</strong><br>
-<div style="margin-top:10px;padding:10px;background:#f0f0f0;border-left:4px solid #cc0000;color:#000;font-family:sans-serif;font-size:14px"><strong>Explanation:</strong> Synchronous TDM interleaves one bit per source into fixed time slots forming frames. Each column above maps one bit from each buffer to a composite output slot.</div>`;
-
-        const addLabel = (txt, y) => {
-            let el = Object.assign(document.createElement('div'), { innerHTML: txt });
-            Object.assign(el.style, { position:'absolute', left:'20px', top:y+'px', fontFamily:'Consolas', fontWeight:'bold' });
-            container.appendChild(el);
-        };
-        labels.forEach((l, i) => addLabel(l, yStarts[i]));
-        addLabel('MUX Output Link:', targetY - 25);
-
-        let bitsDOM = [];
-        sources.forEach((src, ch) => {
-            [...src].forEach((bStr, i) => {
-                let b = Object.assign(document.createElement('div'), { className:'tdm-bit', innerText:bStr });
-                Object.assign(b.style, { left:(120+i*35)+'px', top:yStarts[ch]+'px', backgroundColor:colors[ch] });
-                container.appendChild(b);
-                if (!bitsDOM[i]) bitsDOM[i] = [];
-                bitsDOM[i][ch] = b;
-            });
         });
 
-        for (let i = 0; i < maxLen; i++) {
-            let fb = document.createElement('div');
-            fb.className = 'tdm-frame-box';
-            Object.assign(fb.style, { width:'100px', height:'40px', left:(120+i*110)+'px', top:targetY+'px' });
-            [0,1,2].forEach(s => {
-                let slot = document.createElement('div');
-                Object.assign(slot.style, { borderRight: s<2 ? '1px dashed #2c3e50' : '', width:'33px', height:'100%' });
-                fb.appendChild(slot);
+        // Composite signal
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 12px Consolas';
+        ctx.fillText('Composite Output', sx, 20 + rowH*3 - 5);
+
+        ctx.beginPath();
+        ctx.strokeStyle = '#34495e';
+        ctx.lineWidth = 2.5;
+
+        let midY = 20 + rowH*3 + rowH/2;
+        ctx.moveTo(sx, midY);
+
+        for (let i = 0; i < w; i++) {
+            let combined = freqs.reduce((s, f) => s + Math.sin(i/w*Math.PI*2*f), 0) / freqs.length;
+            ctx.lineTo(sx + i, midY - combined * (rowH/2 - 5));
+        }
+        ctx.stroke();
+
+    } else {
+        // ----------- STATIC TDM GRAPH -----------
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 400;
+
+        const container = $('tdm-anim-container');
+        container.innerHTML = '';
+        container.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+
+        const sources  = [1,2,3].map(i => $(`mux-s${i}`).value.trim() || '0');
+        const colors   = ['#34495e','#2ecc71','#e74c3c'];
+
+        const maxLen = Math.max(...sources.map(s => s.length));
+
+        output.innerHTML = `<strong>TDM Simulation (Static)</strong><br>
+        <div style="margin-top:10px;padding:10px;background:#f0f0f0;border-left:4px solid #cc0000;color:#000;font-family:sans-serif;font-size:14px">
+        <strong>Explanation:</strong> Each time slot takes one bit from each source sequentially. Below shows fixed frame-based multiplexing.
+        </div>`;
+
+        const startX = 80;
+        const startY = 50;
+        const boxW = 40;
+        const boxH = 40;
+
+        // Draw source rows
+        sources.forEach((src, row) => {
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px Consolas';
+            ctx.fillText(`S${row+1}`, 20, startY + row*60 + 25);
+
+            ctx.beginPath();
+            ctx.strokeStyle = colors[row];
+            ctx.lineWidth = 3;
+
+            [...src].forEach((bit, i) => {
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillText(bit, startX + i*boxW + 15, startY + row*60 - 5);
+
+                let y = bit === '1' ? startY + row*60 : startY + row*60 + boxH;
+                let currX = startX + i*boxW;
+                
+                if (i === 0) {
+                    ctx.moveTo(currX, y);
+                } else {
+                    ctx.lineTo(currX, y);
+                }
+                ctx.lineTo(currX + boxW, y);
             });
-            let lbl = Object.assign(document.createElement('span'), { innerText:`Frame ${i+1}` });
-            Object.assign(lbl.style, { position:'absolute', bottom:'-20px', fontSize:'11px' });
-            fb.appendChild(lbl); container.appendChild(fb);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#bdc3c7';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1;
+            ctx.moveTo(startX, startY + row*60 + boxH);
+            ctx.lineTo(startX + src.length*boxW, startY + row*60 + boxH);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+            ctx.lineWidth = 1;
+            for(let i=0; i<=src.length; i++) {
+                ctx.moveTo(startX + i*boxW, startY + row*60 - 10);
+                ctx.lineTo(startX + i*boxW, startY + row*60 + boxH + 10);
+            }
+            ctx.stroke();
+        });
+
+        // Draw TDM output row
+        let yOut = startY + 220;
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 12px Consolas';
+        ctx.fillText('TDM Output', 20, yOut + 25);
+
+        let tdmBits = [];
+        for (let i = 0; i < maxLen; i++) {
+            for (let ch = 0; ch < 3; ch++) {
+                tdmBits.push({ bit: sources[ch][i] || '0', color: colors[ch] });
+            }
         }
 
-        let fi = 0, ci = 0;
-        while (fi < maxLen) {
-            let bitEl = bitsDOM[fi]?.[ci];
-            if (bitEl) {
-                bitEl.style.transition = 'none'; bitEl.style.zIndex = '10';
-                let tx = 120 + fi*110 + ci*33 + 4;
-                bitEl.style.transform = `translate(${tx - parseInt(bitEl.style.left)}px, ${targetY - parseInt(bitEl.style.top) + 6}px) scale(0.9)`;
+        let x = startX;
+        for (let j = 0; j < tdmBits.length; j++) {
+            let item = tdmBits[j];
+            let y = item.bit === '1' ? yOut : yOut + boxH;
+            
+            ctx.fillStyle = item.color;
+            ctx.fillText(item.bit, x + 15, yOut - 5);
+
+            ctx.beginPath();
+            ctx.strokeStyle = item.color;
+            ctx.lineWidth = 3;
+            
+            if (j === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                let prevY = tdmBits[j-1].bit === '1' ? yOut : yOut + boxH;
+                ctx.moveTo(x, prevY);
+                ctx.lineTo(x, y);
             }
-            if (++ci > 2) { ci = 0; fi++; }
+            ctx.lineTo(x + boxW, y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+            ctx.lineWidth = 1;
+            ctx.moveTo(x + boxW, yOut - 10);
+            ctx.lineTo(x + boxW, yOut + boxH + 10);
+            ctx.stroke();
+
+            x += boxW;
         }
+
+        ctx.beginPath();
+        ctx.strokeStyle = '#bdc3c7';
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 1;
+        ctx.moveTo(startX, yOut + boxH);
+        ctx.lineTo(x, yOut + boxH);
+        ctx.stroke();
+        ctx.setLineDash([]);
     }
 }
-
 
 // ----------------------------------------------------
 // MODULE 3: ERROR DETECTION
 // ----------------------------------------------------
 function updateEdInputs() {
-    $('ed-crc-divisor').style.display = $('ed-method').value === 'crc' ? 'flex' : 'none';
+    const method = $('ed-method').value;
+    $('ed-crc-divisor').style.display = method === 'crc' ? 'flex' : 'none';
+    const c2 = $('ed-checksum-data2');
+    if (c2) c2.style.display = method === 'checksum' ? 'flex' : 'none';
+    const l1 = $('ed-data-label');
+    if (l1) l1.innerText = method === 'checksum' ? 'Data Block 1:' : 'Data Block:';
 }
 
 function startErrorDetection() {
@@ -296,20 +392,69 @@ function startErrorDetection() {
     }
 
     else if (method === 'checksum') {
-        let pad = data.padStart(Math.ceil(data.length/8)*8, '0');
-        let chunks = pad.match(/.{8}/g);
-        printStep(`<strong>Checksum (8-bit segments):</strong>`);
-        chunks.forEach(c => printStep(`  ${c}`));
+        const data2 = $('ed-data2') ? $('ed-data2').value.trim() : '';
+        if (!isBin(data2)) { view.innerHTML = "<span style='color:red'>Invalid Block 2 binary input.</span>"; return; }
 
-        let sum = chunks.reduce((s, c) => s + parseInt(c, 2), 0);
-        printStep(`<i>Adding blocks with 1's complement wrapping...</i>`);
-        chunks.forEach(c => printStep(`+ ${c} (${parseInt(c,2)})`));
-        while (sum > 255) { let carry = sum >> 8; sum = (sum & 255) + carry; }
+        const maxLen = Math.max(data.length, data2.length);
+        if (maxLen > 16) { view.innerHTML = "<span style='color:red'>Data too large (max 16 bits advised for visualization).</span>"; return; }
 
-        let chk = (~sum) & 255, binChk = chk.toString(2).padStart(8,'0');
-        printStep(`Sum = ${sum.toString(2).padStart(8,'0')} → 1's Complement = <strong style="color:#e74c3c">${binChk}</strong>`);
-        printStep(`<strong>Transmitted:</strong> <span style="background:#2ecc71;color:#fff;padding:4px">${data} [${binChk}]</span>`);
-        printStep(explBox('Checksum adds fixed-size blocks with carry wrap-around, then inverts to produce a checksum. Receiver adds all segments including checksum; all-1s means error-free.'));
+        const d1 = data.padStart(maxLen, '0');
+        const d2 = data2.padStart(maxLen, '0');
+
+        printStep(`<strong>Checksum Calculation (${maxLen}-bit segments):</strong>`);
+        printStep(`Block 1: <span style="font-family:monospace">${d1}</span> (${parseInt(d1, 2)})`);
+        printStep(`Block 2: <span style="font-family:monospace">${d2}</span> (${parseInt(d2, 2)})`);
+        printStep(`<hr style="border:0.5px dashed #ccc; margin: 4px 0;">`);
+
+        let sum = parseInt(d1, 2) + parseInt(d2, 2);
+        let binSum = sum.toString(2);
+        printStep(`<i>Adding blocks...</i>`);
+        printStep(`Initial Sum: <span style="font-family:monospace">${binSum}</span> (${sum})`);
+
+        let maxVal = Math.pow(2, maxLen) - 1;
+        while (sum > maxVal) { 
+            let carry = sum >> maxLen; 
+            sum = (sum & maxVal) + carry; 
+        }
+
+        let wrappedSum = sum.toString(2).padStart(maxLen, '0');
+        if (wrappedSum !== binSum.padStart(maxLen, '0')) {
+            printStep(`With Carry Wrapped: <span style="font-family:monospace">${wrappedSum}</span> (${sum})`);
+        }
+
+        let chk = (~sum) & maxVal;
+        let binChk = chk.toString(2).padStart(maxLen, '0');
+
+        printStep(`Sum = <span style="font-family:monospace">${wrappedSum}</span> → 1's Complement = <strong style="color:#e74c3c;font-family:monospace">${binChk}</strong>`);
+        printStep(`<strong>Transmitted Data:</strong> <span style="background:#2ecc71;color:#fff;padding:4px;font-family:monospace">${d1} ${d2} ${binChk}</span>`);
+        
+        printStep(`<hr style="border:0.5px dashed #ccc; margin: 15px 0 5px 0;">`);
+        printStep(`<strong>Receiver Side Validation:</strong>`);
+        
+        let rxSum = parseInt(d1, 2) + parseInt(d2, 2) + parseInt(binChk, 2);
+        printStep(`Adding: <span style="font-family:monospace">${d1}</span> + <span style="font-family:monospace">${d2}</span> + Checksum: <strong style="color:#e74c3c;font-family:monospace">${binChk}</strong>`);
+        
+        let rxBinSum = rxSum.toString(2);
+        printStep(`Sum = <span style="font-family:monospace">${rxBinSum}</span> (${rxSum})`);
+        
+        while (rxSum > maxVal) { 
+            let carry = rxSum >> maxLen; 
+            rxSum = (rxSum & maxVal) + carry; 
+        }
+        
+        let rxWrappedSum = rxSum.toString(2).padStart(maxLen, '0');
+        if (rxWrappedSum !== rxBinSum.padStart(maxLen, '0')) {
+            printStep(`With Carry Wrapped: <span style="font-family:monospace">${rxWrappedSum}</span>`);
+        }
+        
+        let isAllOnes = rxWrappedSum.indexOf('0') === -1;
+        if (isAllOnes) {
+            printStep(`<h3 style="color:#2ecc71; margin-top:5px; margin-bottom:5px;">Result: ${rxWrappedSum} ✓ (All 1s - No Error)</h3>`);
+        } else {
+            printStep(`<h3 style="color:#e74c3c; margin-top:5px; margin-bottom:5px;">Result: ${rxWrappedSum} ✗ (Error Detected)</h3>`);
+        }
+
+        printStep(explBox('Checksum adds blocks with carry wrap-around, then inverts to produce the checksum. The receiver repeats the addition including the checksum; all-1s means error-free.'));
     }
 
     else if (method === 'crc') {
