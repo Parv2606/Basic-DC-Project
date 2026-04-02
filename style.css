@@ -389,7 +389,7 @@ span[style*="background:yellow"] {
 span[style*="color:#e74c3c"], b[style*="color:red"] {
     color: #cf222e !important;
 }
-hr[style*="border:1px dashed #ccc"] {
+hr[style*="dashed #ccc"] {
     border-top: 1px solid var(--border-color) !important;
     border-bottom: none !important;
 }
